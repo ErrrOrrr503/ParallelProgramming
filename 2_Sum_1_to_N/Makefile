@@ -20,4 +20,4 @@ run:
 clean: 
 	rm 2_Sum_1_to_N ./job.sh 
 help: 
-	@echo -e "Run make to compile and generate job.sh.\nYou can set\nMAX_RUNTIME=hh:mm:ss\nPPN (process per node)\nNUM_PROC (total processes)\nNODES (number of nodes to use)\nAnd ARGS for the programm to be run\nThen use 'make run' to run."
+	@echo -e "Run make to compile and generate job.sh.\nYou can set\nMAX_RUN_TIME=hh:mm:ss\nPPN (process per node)\nNUM_PROC (total processes)\nNODES (number of nodes to use)\nAnd ARGS for the programm to be run\nThen use 'make run' to run."
