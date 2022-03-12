@@ -37,7 +37,7 @@ Prints "Hello from rank <№/rank"of the process> of <communicator size>"  from 
 
 # 2_Sum_1_to_N
 
-Second task. Calculates sum from 1 to N. Accepts N as an argument
+Second task. Calculates sum from 1 to N. Accepts N as an argument. Also calculates approximate time of each process working, due to async sending sometimes processes exit after main prints out result.
 
     project_dir> make ARGS="5"
     project_dir> make run

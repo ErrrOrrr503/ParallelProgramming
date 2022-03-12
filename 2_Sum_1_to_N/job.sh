@@ -2,4 +2,4 @@
 #PBS -N 2_Sum_1_to_N 
 #PBS -q batch 
 cd $PBS_O_WORKDIR 
-mpirun --hostfile $PBS_NODEFILE  ./2_Sum_1_to_N
+mpirun --hostfile $PBS_NODEFILE  ./2_Sum_1_to_N 
