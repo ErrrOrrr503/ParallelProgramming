@@ -16,7 +16,6 @@ do
     SOURCE_LIST="$SOURCE_LIST $SOURCE_FILE"
 done
 # generate Makefile that can generate job.sh
-rm ./$1/Makefile
 printf "\
 ifdef NUM_PROC \n\
 \tNP=\"-np \$(NUM_PROC)\" \n\
@@ -33,19 +32,19 @@ else \n\
 \tWALLTIME=\"walltime=00:01:00\" \n\
 endif \n\
 all: \n\
-\tmpicc -o $BINFILE $SOURCE_LIST \n\
+\tmpicc -std=c11 -o $BINFILE $SOURCE_LIST \n\
 \techo -e \"\
 \\\\043PBS -l \$(WALLTIME)\$(NDS)\$(PN)\\\\n\
 \\\\043PBS -N $BINFILE \\\\n\
 \\\\043PBS -q batch \\\\n\
 cd \\\\044PBS_O_WORKDIR \\\\n\
-mpirun --hostfile \\\\044PBS_NODEFILE \$(NP) ./$BINFILE\"\
+mpirun --hostfile \\\\044PBS_NODEFILE \$(NP) ./$BINFILE \$(ARGS)\"\
 \t> job.sh \n\
 run: \n\
 \tqsub ./job.sh \n\
 clean: \n\
 \trm $BINFILE ./job.sh \n\
 help: \n\
-\t@echo -e \"Run make to compile and generate job.sh.\\\\nYou can set\\\\nMAX_RUNTIME=hh:mm:ss\\\\nPPN (process per node)\\\\nNUM_PROC (total processes)\\\\nNODES (number of nodes to use)\\\\nThen use 'make run' to run.\""\
->> ./$1/Makefile
+\t@echo -e \"Run make to compile and generate job.sh.\\\\nYou can set\\\\nMAX_RUNTIME=hh:mm:ss\\\\nPPN (process per node)\\\\nNUM_PROC (total processes)\\\\nNODES (number of nodes to use)\\\\nAnd ARGS for the programm to be run\\\\nThen use 'make run' to run.\""\
+> ./$1/Makefile
 exit 0
