@@ -45,6 +45,6 @@ run: \n\
 clean: \n\
 \trm $BINFILE ./job.sh \n\
 help: \n\
-\t@echo -e \"Run make to compile and generate job.sh.\\\\nYou can set\\\\nMAX_RUNTIME=hh:mm:ss\\\\nPPN (process per node)\\\\nNUM_PROC (total processes)\\\\nNODES (number of nodes to use)\\\\nAnd ARGS for the programm to be run\\\\nThen use 'make run' to run.\""\
+\t@echo -e \"Run make to compile and generate job.sh.\\\\nYou can set\\\\nMAX_RUN_TIME=hh:mm:ss\\\\nPPN (process per node)\\\\nNUM_PROC (total processes)\\\\nNODES (number of nodes to use)\\\\nAnd ARGS for the programm to be run\\\\nThen use 'make run' to run.\""\
 > ./$1/Makefile
 exit 0
