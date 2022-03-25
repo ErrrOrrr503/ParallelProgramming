@@ -17,6 +17,7 @@ do
 done
 # generate Makefile that can generate job.sh
 printf "\
+CFLAGS+=\"-std=c11\" \n\
 ifdef NUM_PROC \n\
 \tNP=\"-np \$(NUM_PROC)\" \n\
 endif \n\
@@ -32,7 +33,7 @@ else \n\
 \tWALLTIME=\"walltime=00:01:00\" \n\
 endif \n\
 all: \n\
-\tmpicc -std=c11 -o $BINFILE $SOURCE_LIST \n\
+\tmpicc \$(CFLAGS) -o $BINFILE $SOURCE_LIST \n\
 \techo -e \"\
 \\\\043PBS -l \$(WALLTIME)\$(NDS)\$(PN)\\\\n\
 \\\\043PBS -N $BINFILE \\\\n\
