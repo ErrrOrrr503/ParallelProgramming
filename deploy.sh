@@ -1,6 +1,7 @@
 #!/bin/bash
 if [[ $# -eq 0 ]] ; then
-    echo "Usage: ./deploy.sh <source folder> [max run time] "
+    echo "Usage: ./deploy.sh <source folder>"
+    echo "Or:    ./deploy.sh upload <source folder>"
     exit 255
 fi
 

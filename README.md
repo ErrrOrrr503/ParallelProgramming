@@ -60,7 +60,17 @@ Third task. Same as *ring_communication* but using star communication: 0 -> N-1 
 
 # 4_row_sum
 
-Forth task. Calculates **e** or **pi**. Accepts number of series members and **-pi** of **-e** (default) as arguments. For **e** Teilor's series is used. For **pi** Newton's methof of pi/2 = SUM k!/(2k + 1)!! is used. Firstly, part-factorials are precalculated. If each process receive Nproc members, it will Nproc, Nproc*(Nproc + 1), Nproc*(Nproc + 1)(Nproc + 2), ... and then share this with all the others. After that from part-factorials reals factorials of rank predecessors are calculated for O(communicator size). Then member part sums cre calculated and passed to main thread. For -e rough estimate is O(N_proc(pre-fact) + comm_size(pred_fact) + N_proc(part sums) + comm_size (main thread calculate sum)). Long double enables handling ~1e6 members for **e** and >500 members for **pi**. Execution time is measured.
+Forth task. Calculates **e** or **pi**. Accepts number of series members and **-pi** of **-e** (default) as arguments.
+
+For **e** Teilor's series is used. For **pi** Newton's methof of pi/2 = SUM k!/(2k + 1)!! is used.
+
+Firstly, part-factorials are precalculated. If each process receive Nproc members, it will Nproc, Nproc*(Nproc + 1), Nproc*(Nproc + 1)(Nproc + 2), ... and then share this with all the others. After that from part-factorials reals factorials of rank predecessors are calculated for O(communicator size). Then member part sums cre calculated and passed to main thread.
+
+For -e rough estimate is O(N_proc(pre-fact) + comm_size(pred_fact) + N_proc(part sums) + comm_size (main thread calculate sum)).
+
+Long double enables handling ~1e6 members for **e** and >500 members for **pi**.
+
+Execution time is measured.
 
     project_dir> make NUM_PROC=13 ARGS="666 -pi"
     project_dir> make NUM_PROC=13 ARGS="666 -e"
