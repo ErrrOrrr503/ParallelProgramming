@@ -20,7 +20,7 @@ int main (int argc, char *argv[])
     MPI_Comm_rank (MPI_COMM_WORLD, &rank);
     if (argc < 2 || (argc > 2 && (strcmp (argv[2], "-pi") && strcmp (argv[2], "-e")))) {
         if (!rank)
-            printf ("usage: mpirun %s <N - number of row members>[-e(default) -pi to calculate]\n", argv[0]);
+            printf ("usage: mpirun %s <N - number of row members> [-e(default) or -pi to calculate pi]\n", argv[0]);
         return 1;
     }
     char calc_pi = 0;
@@ -30,7 +30,7 @@ int main (int argc, char *argv[])
     assert (N > 0);
     
     double time_start = MPI_Wtime ();
-    //first processes  N/nproc + 1, rest will receive N/nproc.
+    //first processes receive N/nproc + 1, rest will receive N/nproc.
     long long N_nproc = N / comm_size;
     long long N_nproc_1 = N_nproc + 1;
     long long N_rest = N % comm_size;
@@ -91,12 +91,17 @@ int main (int argc, char *argv[])
                 max_rank_fact2[rank + 1] = factorials2[N_nproc - 1];
         }
     }
-    // share all to all
+    // share all to all and finalize calculation
     for (int i = 1; i < comm_size; i++)
         MPI_Gather (&max_rank_fact[rank + 1], sizeof (fact_t), MPI_CHAR, &max_rank_fact[1], sizeof (fact_t), MPI_CHAR, i, MPI_COMM_WORLD);
     if (calc_pi) {
         for (int i = 1; i < comm_size; i++)
             MPI_Gather (&max_rank_fact2[rank + 1], sizeof (fact_t), MPI_CHAR, &max_rank_fact2[1], sizeof (fact_t), MPI_CHAR, i, MPI_COMM_WORLD);
+    }
+    for (int i = 2; i < comm_size; i++) {
+        max_rank_fact[i] *= max_rank_fact[i - 1];
+        if (calc_pi)
+            max_rank_fact2[i] *= max_rank_fact2[i - 1];
     }
     //calculate and send sums
     if (rank < N_rest) {
@@ -122,8 +127,9 @@ int main (int argc, char *argv[])
     float_t S0 = 0;
     MPI_Reduce (&S, &S0, 1, MPI_LONG_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
     double time_rank_end = MPI_Wtime ();
-    if (rank)
+    if (rank) {
         printf ("Process %d finished in = %.10f seconds\n", rank, time_rank_end - time_start);
+    }
     else {
         printf ("Main process finished in = %.10f seconds, waiting for others\n", time_rank_end - time_start);
         if (!calc_pi)
