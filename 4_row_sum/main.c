@@ -30,12 +30,18 @@ int main (int argc, char *argv[])
     assert (N > 0);
     
     double time_start = MPI_Wtime ();
-    //first processes receive N/nproc + 1, rest will receive N/nproc.
+    // first processes receive N/nproc + 1, rest will receive N/nproc.
+    // precalc and share factorials and double factorials
+    // in fact factorials are pseudo factorials:
+    // rank0: calculates 1 2 6 ... N!
+    // rank1: (N+1) (N+1)(N+2) ... - pseudo factprials
+    // ...
+    // so real factorial for rank is max_rank_fact[rank ] * pseudo factorial
     long long N_nproc = N / comm_size;
     long long N_nproc_1 = N_nproc + 1;
     long long N_rest = N % comm_size;
     float_t S = 0;
-    fact_t *max_rank_fact = (fact_t *) malloc ((comm_size + 1) * sizeof (fact_t)); // extra one for Gather workaround: k sends max_rank_fact [k+1] to k+1.
+    fact_t *max_rank_fact = (fact_t *) malloc ((comm_size + 1) * sizeof (fact_t)); // extra one for Gather workaround: rnak_k sends max_rank_fact [k+1] to k+1, not to k
     fact_t *max_rank_fact2 = NULL;
     max_rank_fact[0] = 1;
     if (calc_pi) {
@@ -44,7 +50,6 @@ int main (int argc, char *argv[])
     }
     fact_t *factorials = NULL;
     fact_t *factorials2 = NULL;
-    // precalc and share factorials
     if (rank < N_rest) {
         factorials = (fact_t *) malloc (N_nproc_1 * sizeof (fact_t));
         if (calc_pi)
@@ -68,6 +73,7 @@ int main (int argc, char *argv[])
                 max_rank_fact2[rank + 1] = factorials2[N_nproc_1 - 1];
         }
     }
+    // just same as above but with different N_proc.
     else {
         factorials = (fact_t *) malloc (N_nproc * sizeof (fact_t));
         if (calc_pi)
@@ -91,19 +97,20 @@ int main (int argc, char *argv[])
                 max_rank_fact2[rank + 1] = factorials2[N_nproc - 1];
         }
     }
-    // share all to all and finalize calculation
+    // share all to all
     for (int i = 1; i < comm_size; i++)
         MPI_Gather (&max_rank_fact[rank + 1], sizeof (fact_t), MPI_CHAR, &max_rank_fact[1], sizeof (fact_t), MPI_CHAR, i, MPI_COMM_WORLD);
     if (calc_pi) {
         for (int i = 1; i < comm_size; i++)
             MPI_Gather (&max_rank_fact2[rank + 1], sizeof (fact_t), MPI_CHAR, &max_rank_fact2[1], sizeof (fact_t), MPI_CHAR, i, MPI_COMM_WORLD);
     }
+    // finalize calculation for max_rank_fact
     for (int i = 2; i < comm_size; i++) {
         max_rank_fact[i] *= max_rank_fact[i - 1];
         if (calc_pi)
             max_rank_fact2[i] *= max_rank_fact2[i - 1];
     }
-    //calculate and send sums
+    //calculate sums
     if (rank < N_rest) {
         long long start = N_nproc_1 * rank + 1;
         for (long long num = start; (num - start) < N_nproc_1; num++) {
@@ -123,7 +130,7 @@ int main (int argc, char *argv[])
         }
     }
     MPI_Request unused_request;
-    // reduce
+    // reduce sums to one
     float_t S0 = 0;
     MPI_Reduce (&S, &S0, 1, MPI_LONG_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
     double time_rank_end = MPI_Wtime ();
