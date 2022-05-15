@@ -35,6 +35,8 @@
 #include <unistd.h>
 
 #define MPI_TAG_EDGE_TRANSFER 1
+#define MPI_TAG_EDGE_TRANSFER_LEFT 3
+#define MPI_TAG_EDGE_TRANSFER_RIGHT 4
 #define MPI_TAG_GATHER 2
 
 template <typename num_t>
@@ -69,6 +71,7 @@ class transfer_equation {
 
         void set_verboseness (int verboseness);
         void solve_explicit_level_triange ();
+        void solve_explicit_quad_dot ();
         void gather_result_to_matrix (size_t t_start, size_t t_end);
         void print_ans ();
         void print_perf ();
@@ -219,9 +222,6 @@ void transfer_equation<num_t>::solve_explicit_level_triange ()
     if (!_n_for_proc) // nothing to do
         return;
     _u = new num_t [n_for_proc * _t_points];
-    //for (size_t i = 0; i < _n_for_proc * _t_points; i++) {
-    //    _u[i] = -7 * _rank;
-    //}
     for (size_t layer = 0; layer < _t_points; layer++) {
         if (layer == 0) {
             for (size_t i = n_for_proc; i > 0; i--)
@@ -242,6 +242,100 @@ void transfer_equation<num_t>::solve_explicit_level_triange ()
             }
             else { // u[t][0] is calculated from initial conditions
                 _u[layer * _n_for_proc] = _u_0_t (layer * _t);
+            }
+        }
+    }
+    _rank_time_calc = MPI_Wtime () - calc_start;
+}
+
+template <typename num_t>
+void transfer_equation<num_t>::solve_explicit_quad_dot ()
+{
+    // each process recieves work to calculate N = x_points / comm_size or N+1 points.
+    // firstly each process except the last one will calculate
+    double calc_start = MPI_Wtime ();
+    MPI_Request unused_request;
+
+    size_t n_for_proc = _x_points / _comm_size;
+    _n_rest = _x_points % _comm_size;
+    size_t start = (n_for_proc + 1) * _n_rest + n_for_proc * (_rank - _n_rest);
+    if (_rank < _n_rest) {
+        start = (n_for_proc + 1) * _rank;
+        n_for_proc = n_for_proc + 1;
+    }
+    _n_for_proc = n_for_proc;
+    if (!_n_for_proc) // nothing to do
+        return;
+    _u = new num_t [n_for_proc * _t_points];
+    for (size_t layer = 0; layer < _t_points; layer++) {
+        if (layer == 0) {
+            for (size_t i = n_for_proc; i > 0; i--)
+                _u[i - 1] = _u_x_0 ((start + i - 1) * _h);
+        }
+        else {
+            // send edge point in order other process can calculate it's part of the layer
+            if (!_rank) {
+                // rank0 should pass only end point 
+                if (_rank < _comm_size - 1) {
+                    MPI_Isend (&_u[(layer - 1) * _n_for_proc + n_for_proc - 1], sizeof (num_t), MPI_CHAR, _rank + 1, MPI_TAG_EDGE_TRANSFER_LEFT, MPI_COMM_WORLD, &unused_request);
+                }
+            }
+            else {
+                if (_rank < _comm_size - 1) {
+                    // middle ranks should pass both points.
+                    MPI_Isend (&_u[(layer - 1) * _n_for_proc + n_for_proc - 1], sizeof (num_t), MPI_CHAR, _rank + 1, MPI_TAG_EDGE_TRANSFER_LEFT, MPI_COMM_WORLD, &unused_request);
+                    MPI_Isend (&_u[(layer - 1) * _n_for_proc], sizeof (num_t), MPI_CHAR, _rank - 1, MPI_TAG_EDGE_TRANSFER_RIGHT, MPI_COMM_WORLD, &unused_request);
+                }
+                else
+                    MPI_Isend (&_u[(layer - 1) * _n_for_proc], sizeof (num_t), MPI_CHAR, _rank - 1, MPI_TAG_EDGE_TRANSFER_RIGHT, MPI_COMM_WORLD, &unused_request);
+            }
+
+            // calculate part until edge except the very left point (we should receive data for it)
+            for (ssize_t i = (ssize_t) n_for_proc - 2; i > 0; i--) {
+                _u[layer * _n_for_proc + i] = _t * (_f ((i + start) * _h, (layer - 1) * _t) - _a * (_u[(layer - 1) * _n_for_proc + i + 1] - _u[(layer - 1) * _n_for_proc + i - 1]) / 2 / _h + 0.5 * _a * _t * (_u[(layer - 1) * _n_for_proc + i + 1] - 2 * _u[(layer - 1) * _n_for_proc + i] + _u[(layer - 1) * _n_for_proc + i - 1]) / _h / _h) + _u[(layer - 1) * _n_for_proc + i];
+            }
+            if (n_for_proc > 1) {
+                // receive calculate value on right edge
+                if (_rank) {
+                    num_t u_i_1_layer_1 = -1;
+                    MPI_Recv (&u_i_1_layer_1, sizeof (num_t), MPI_CHAR, _rank - 1, MPI_TAG_EDGE_TRANSFER_LEFT, MPI_COMM_WORLD, NULL);
+                    _u[layer * _n_for_proc] = _t * (_f (start * _h, (layer - 1) * _t) - _a * (_u[(layer - 1) * _n_for_proc + 1] - u_i_1_layer_1) / 2 / _h + 0.5 * _a * _t * (_u[(layer - 1) * _n_for_proc + 1] - 2 * _u[(layer - 1) * _n_for_proc] + u_i_1_layer_1) / _h / _h) + _u[(layer - 1) * _n_for_proc];
+                }
+                else { // u[t][0] is calculated from initial conditions
+                    _u[layer * _n_for_proc] = _u_0_t (layer * _t);
+                }
+                // receive and calculate value on left edge
+                if (_rank < _comm_size - 1) {
+                    num_t u_i_1_layer1 = -1;
+                    MPI_Recv (&u_i_1_layer1, sizeof (num_t), MPI_CHAR, _rank + 1, MPI_TAG_EDGE_TRANSFER_RIGHT, MPI_COMM_WORLD, NULL);
+                    size_t i = _n_for_proc - 1;
+                    _u[layer * _n_for_proc + i] = _t * (_f ((i + start) * _h, (layer - 1) * _t) - _a * (u_i_1_layer1 - _u[(layer - 1) * _n_for_proc + i - 1]) / 2 / _h + 0.5 * _a * _t * (u_i_1_layer1 - 2 * _u[(layer - 1) * _n_for_proc + i] + _u[(layer - 1) * _n_for_proc + i - 1]) / _h / _h) + _u[(layer - 1) * _n_for_proc + i];
+                }
+                else {
+                    // we could have used characteristics to find out the value if f === 0, but in that case approximation is not necessary at all.
+                    // so we will use left triangle by far, losing order due to these edge points.
+                    size_t i = n_for_proc - 1;
+                    _u[layer * _n_for_proc + i] = _t * (_f ((i + start) * _h, (layer - 1) * _t) - _a * (_u[(layer - 1) * _n_for_proc + i] - _u[(layer - 1) * _n_for_proc + i - 1]) / _h) + _u[(layer - 1) * _n_for_proc + i];
+                }
+            }
+            else {
+                if (_rank < _comm_size - 1) {
+                    if (_rank) {
+                        num_t u_i_1_layer_1 = -1;
+                        MPI_Recv (&u_i_1_layer_1, sizeof (num_t), MPI_CHAR, _rank - 1, MPI_TAG_EDGE_TRANSFER_LEFT, MPI_COMM_WORLD, NULL);
+                        num_t u_i_1_layer1 = -1;
+                        MPI_Recv (&u_i_1_layer1, sizeof (num_t), MPI_CHAR, _rank + 1, MPI_TAG_EDGE_TRANSFER_RIGHT, MPI_COMM_WORLD, NULL);
+                        _u[layer * _n_for_proc] = _t * (_f (start * _h, (layer - 1) * _t) - _a * (u_i_1_layer1 - u_i_1_layer_1) / 2 / _h + 0.5 * _a * _t * (u_i_1_layer1 - 2 * _u[(layer - 1) * _n_for_proc] + u_i_1_layer_1) / _h / _h) + _u[(layer - 1) * _n_for_proc];
+                    }
+                    else{
+                        _u[layer * _n_for_proc] = _u_0_t (layer * _t);
+                    }
+                }
+                else {
+                    num_t u_i_1_layer_1 = -1;
+                    MPI_Recv (&u_i_1_layer_1, sizeof (num_t), MPI_CHAR, _rank - 1, MPI_TAG_EDGE_TRANSFER_LEFT, MPI_COMM_WORLD, NULL);
+                    _u[layer * _n_for_proc] = _t * (_f (start * _h, (layer - 1) * _t) - _a * (_u[(layer - 1) * _n_for_proc] - u_i_1_layer_1) / _h) + _u[(layer - 1) * _n_for_proc];
+                }
             }
         }
     }

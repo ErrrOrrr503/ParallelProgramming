@@ -56,7 +56,7 @@ int main (int argc, char *argv[])
     }
     transfer_equation<num_t> treq (x_points, t_points, x_max, t_max, a, f, u_x_0, u_0_t);
     treq.set_verboseness (0);
-    treq.solve_explicit_level_triange ();
+    treq.solve_explicit_quad_dot ();
     treq.gather_result_to_matrix (layer_start, layer_end);
     if (is_print_ans)
         treq.print_ans ();
