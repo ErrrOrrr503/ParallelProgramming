@@ -75,3 +75,11 @@ Execution time is measured.
     project_dir> make NUM_PROC=13 ARGS="666 -pi"
     project_dir> make NUM_PROC=13 ARGS="666 -e"
     project_dir> make run
+
+# 5_pthread_hw
+
+Prints "Hello from tid <thread id of the thread>"  from all the initiated threads, except main one - that is the main process. **make** still use qsub to manage runtime.
+
+    project_dir> make ARGS=<number of threads to run>
+    project_dir> make run
+    project_dir> cat stdout.txt
