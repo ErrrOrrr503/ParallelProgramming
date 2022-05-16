@@ -88,7 +88,14 @@ Prints "Hello from tid <thread id of the thread>"  from all the initiated thread
 
 Calculates sum from 1 to N. Accepts number of threads and N as an argument. Also calculates approximate time of each process working. g++ is required due to gcc can't include neither time.h not bits/time.h properly.
 
-    project_dir> make ARGS=" 13 189"
+    project_dir> make ARGS="13 189"
     project_dir> make run
 
 will calculate 1 + 2 + 3 + 4 + 5 + ... + 189 on 13 threads.
+
+# 7_pthread_integrate
+
+Calculates integral of function F (currently F = x^2). start, end and step should be passed as arguments. Each thread adds it's part to total sum using a semaphore for synchronization.
+
+    project_dir> make ARGS="<number of threads> <start> <end> <step>"
+    project_dir> make run
