@@ -20,10 +20,15 @@ int main (int argc, char *argv[]) {
     int num_proc = atoi (argv[1]);
     pthread_t *tids = (pthread_t *) calloc (num_proc, sizeof (pthread_t));
     pthread_attr_t *thr_attrs = (pthread_attr_t *) calloc (num_proc, sizeof (pthread_attr_t));
-    // just create necessary amount of threads
+    // just create necessary amount of
     for (int i = 0; i < num_proc; i++) {
         pthread_attr_init (&thr_attrs[i]);
         pthread_create (&tids[i], &thr_attrs[i], thread_routing, NULL);
         pthread_join (tids[i], NULL);
     }
+    for (int i = 0; i < num_proc; i++)
+        pthread_join (tids[i], NULL);
+    free (tids);
+    free (thr_attrs);
+    return 0;
 }
