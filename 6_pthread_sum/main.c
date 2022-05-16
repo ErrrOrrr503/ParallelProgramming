@@ -11,7 +11,7 @@ struct sum_part {
     size_t thread_num;
 };
 
-void *thread_routing (void *S_part) {
+void *thread_routine (void *S_part) {
     struct timespec begin, end;
     clock_gettime (CLOCK_REALTIME, &begin);
 
@@ -36,6 +36,7 @@ int main (int argc, char *argv[]) {
     struct timespec begin, end;
     clock_gettime (CLOCK_REALTIME, &begin);
 
+    // determine constants
     size_t N = (size_t) atoll (argv[2]);
     size_t N_proc = (size_t) atoll (argv[1]);
     size_t N_for_proc = N / N_proc;
@@ -47,6 +48,7 @@ int main (int argc, char *argv[]) {
     // just create necessary amount of
     for (size_t i = 0; i < N_proc; i++) {
         pthread_attr_init (&thr_attrs[i]);
+        // determine amount of work and start numbers. thread_num is needed not to use non human-readable tids.
         if (i < N_rest) {
             S_parts[i].start = (N_for_proc + 1) * i + 1;
             S_parts[i].N_for_proc = N_for_proc + 1;
@@ -57,8 +59,10 @@ int main (int argc, char *argv[]) {
             S_parts[i].N_for_proc = N_for_proc;
             S_parts[i].thread_num = i;
         }
-        pthread_create (&tids[i], &thr_attrs[i], thread_routing, (void **) &S_parts[i]);
+        // start routines
+        pthread_create (&tids[i], &thr_attrs[i], thread_routine, (void **) &S_parts[i]);
     }
+    // reduce
     size_t *p_S_part;
     size_t S = 0;
     for (size_t i = 0; i < N_proc; i++) {
