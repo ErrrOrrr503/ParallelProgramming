@@ -8,14 +8,23 @@
 struct sum_part {
     size_t start;
     size_t N_for_proc;
+    size_t thread_num;
 };
 
 void *thread_routing (void *S_part) {
+    struct timespec begin, end;
+    clock_gettime (CLOCK_REALTIME, &begin);
+
     size_t start = ((struct sum_part *) S_part)->start;
     size_t N_for_proc = ((struct sum_part *) S_part)->N_for_proc;
+    size_t thread_num = ((struct sum_part *) S_part)->thread_num;
     size_t *S = (size_t *) calloc (1, sizeof (size_t));
     for (size_t i = start; i < N_for_proc + start; i++)
         *S += i;
+
+    clock_gettime (CLOCK_REALTIME, &end);
+    double elapsed = end.tv_sec - begin.tv_sec + (end.tv_nsec - begin.tv_nsec) / 1000000000.0;
+    printf ("Thread %lu finished, %lgs elapsed\n", thread_num, elapsed);
     pthread_exit (S);
 }
 
@@ -41,10 +50,12 @@ int main (int argc, char *argv[]) {
         if (i < N_rest) {
             S_parts[i].start = (N_for_proc + 1) * i + 1;
             S_parts[i].N_for_proc = N_for_proc + 1;
+            S_parts[i].thread_num = i;
         }
         else {
             S_parts[i].start = (N_for_proc + 1) * N_rest + N_for_proc * (i - N_rest) + 1;
             S_parts[i].N_for_proc = N_for_proc;
+            S_parts[i].thread_num = i;
         }
         pthread_create (&tids[i], &thr_attrs[i], thread_routing, (void **) &S_parts[i]);
     }
