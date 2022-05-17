@@ -24,7 +24,6 @@ int main (int argc, char *argv[]) {
     for (int i = 0; i < num_proc; i++) {
         pthread_attr_init (&thr_attrs[i]);
         pthread_create (&tids[i], &thr_attrs[i], thread_routing, NULL);
-        pthread_join (tids[i], NULL);
     }
     for (int i = 0; i < num_proc; i++)
         pthread_join (tids[i], NULL);
