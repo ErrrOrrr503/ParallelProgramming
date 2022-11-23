@@ -16,6 +16,7 @@ int fetch_sz = 2;
 
 double* gather_vertical_submatrix (double *a, const int i_size, const int j_size, const int j_for_rank);
 time_run_t gather_max_time (time_run_t time);
+void calculate_limits (int rank, int j_size, int *j_for_rank, int *int_num_rest, int *int_rank_shift);
 
 int main (int argc, char **argv)
 {
@@ -52,15 +53,8 @@ int main (int argc, char **argv)
     // out algo will firstly calculate 2 start points and send them, then run through his part
     // then receive and finish row calc.
     // We will NOT consider the case of less than 4 points for each runner.
-    int j_for_rank = (j_size - fetch_sz) / comm_size;
-    int int_num_rest = (j_size - fetch_sz) % comm_size;
-    int int_rank_shift = rank * j_for_rank;
-    if (rank >= int_num_rest)
-        int_rank_shift = int_num_rest * (j_for_rank + 1) + (rank - int_num_rest) * j_for_rank;
-    if (rank < int_num_rest)
-        j_for_rank++;
-    if (rank == comm_size - 1)
-        j_for_rank += fetch_sz;
+    int j_for_rank = -1, int_num_rest = -1, int_rank_shift = -1;
+    calculate_limits (rank, j_size, &j_for_rank, &int_num_rest, &int_rank_shift);
     double *a = (double *) calloc (i_size * j_for_rank, sizeof (double));
     //подготовительная часть – заполнение некими данными
     for (int i = 0; i < i_size; i++) {
@@ -70,7 +64,7 @@ int main (int argc, char **argv)
     }
     // task
     MPI_Request unused_request;
-    double a_i_3_recv[2];
+    double *a_i_3_recv = calloc (fetch_sz, sizeof (double));
     time_run_t time_start = MPI_Wtime ();
     for (int i = 3; i < i_size; i++)
     {
@@ -78,11 +72,11 @@ int main (int argc, char **argv)
         double *a_i = a + i * j_for_rank;
         double *a_i_3 = a + (i - 3) * j_for_rank;
         if (rank)
-            MPI_Isend(a_i_3, 2, MPI_DOUBLE, rank - 1, MPI_TAG_EDGE, MPI_COMM_WORLD, &unused_request);
+            MPI_Isend(a_i_3, fetch_sz, MPI_DOUBLE, rank - 1, MPI_TAG_EDGE, MPI_COMM_WORLD, &unused_request);
         for (int j = 0; j < j_for_rank - fetch_sz; j++)
             a_i[j] = sin (3 * a_i_3[j + fetch_sz]);
         if (rank < comm_size - 1) {
-            MPI_Recv(a_i_3_recv, 2, MPI_DOUBLE, rank + 1, MPI_TAG_EDGE, MPI_COMM_WORLD, NULL);
+            MPI_Recv(a_i_3_recv, fetch_sz, MPI_DOUBLE, rank + 1, MPI_TAG_EDGE, MPI_COMM_WORLD, NULL);
             for (int j = j_for_rank - fetch_sz; j < j_for_rank; j++)
                 a_i[j] = sin (3 * a_i_3_recv[j - j_for_rank + fetch_sz]);
         }
@@ -108,6 +102,7 @@ int main (int argc, char **argv)
         fclose(ff);
     }
     free (res);
+    free (a_i_3_recv);
 
     MPI_Finalize ();
     return 0;
@@ -146,15 +141,8 @@ double* gather_vertical_submatrix (double *a, const int i_size, const int j_size
         free (a);
         double *a_recv = calloc (((j_size - fetch_sz) / comm_size + fetch_sz) * i_size, sizeof (double));
         for (int sender = 1; sender < comm_size; sender++) {
-            int j_for_sender = (j_size - fetch_sz) / comm_size;
-            int int_num_rest = (j_size - fetch_sz) % comm_size;
-            int shift = sender * j_for_sender;
-            if (sender >= int_num_rest)
-                shift = int_num_rest * (j_for_sender + 1) + (sender - int_num_rest) * j_for_sender;
-            if (sender < int_num_rest)
-                j_for_sender++;
-            if (sender == comm_size - 1)
-                j_for_sender += fetch_sz;
+            int j_for_sender = -1, int_num_rest = -1, shift = -1;
+            calculate_limits (sender, j_size, &j_for_sender, &int_num_rest, &shift);
             MPI_Recv (a_recv, i_size * j_for_sender, MPI_DOUBLE, sender, MPI_TAG_GATHER, MPI_COMM_WORLD, NULL);
             for (int i = 0; i < i_size; i++)
                 memcpy (a_full + i * j_size + shift, a_recv + i * j_for_sender, j_for_sender * sizeof (double));
@@ -167,4 +155,19 @@ double* gather_vertical_submatrix (double *a, const int i_size, const int j_size
         return (a);
     }
     return NULL;
+}
+
+void calculate_limits (int rank, int j_size, int *j_for_rank, int *int_num_rest, int *int_rank_shift)
+{
+    int comm_size = -1;
+    MPI_Comm_size (MPI_COMM_WORLD, &comm_size);
+    *j_for_rank = (j_size - fetch_sz) / comm_size;
+    *int_num_rest = (j_size - fetch_sz) % comm_size;
+    *int_rank_shift = rank * (*j_for_rank + 1);
+    if (rank >= *int_num_rest)
+        *int_rank_shift = *int_num_rest * (*j_for_rank + 1) + (rank - *int_num_rest) * *j_for_rank;
+    if (rank < *int_num_rest)
+        (*j_for_rank)++;
+    if (rank == comm_size - 1)
+        *j_for_rank += fetch_sz;
 }
