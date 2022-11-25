@@ -90,23 +90,24 @@ int main (int argc, char **argv)
                 a_i[j] = sin (3 * a_i_3_recv[j - j_for_rank + fetch_sz]);
         }
     }
-    /*
+    
     time_run_t time_calc = MPI_Wtime () - time_start;
 
     // gather time and figure out MAX time_calc.
     time_run_t max_time = gather_max_time (time_calc);
     if (!rank)
         printf ("%f\n", max_time);
-    */
+    
     //gather result
     double *res = gather_vertical_submatrix (a, i_size, j_size, j_for_rank);
+    /*
     time_run_t time_full = MPI_Wtime () - time_start;
 
     // gather time and figure out MAX time_calc.
     time_run_t max_time = gather_max_time (time_full);
     if (!rank)
         printf ("%f\n", max_time);
-
+    */
     if (!rank) {
         if (mpi_file != NULL) {
             FILE *ff = fopen(mpi_file,"w");
